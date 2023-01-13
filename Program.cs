@@ -39,7 +39,7 @@ class BruteForce
 
             if (Enumerable.SequenceEqual(_word, _findWord))
             {
-                Console.WriteLine("End");
+                Console.WriteLine(new String(_word));
                 return;
             }
             //Console.WriteLine(new String(_word));
@@ -98,13 +98,17 @@ class Sheduler
                 
                 BruteForce temp = _bruteObjectsQueue.Dequeue();
                 temp.Stop(true, _threadQueue.Peek().Name);
+                
+                
                 if (_threadQueue.Peek().IsAlive)
                 {
                     _bruteObjectsQueue.Enqueue(temp);
                     _threadQueue.Enqueue(_threadQueue.Dequeue());
                 }
+                else _threadQueue.Dequeue();
 
                 if (_bruteObjectsQueue.Count == 0) return;
+                
                 
                 _bruteObjectsQueue.Peek().Continue();
                 sw = Stopwatch.StartNew();
@@ -115,7 +119,7 @@ class Sheduler
     // Конструктор БУПа.
     public Sheduler()
     {
-        BruteForce alpha = new BruteForce("hello");
+        BruteForce alpha = new BruteForce("ahega");
         BruteForce beta = new BruteForce("daily");
         BruteForce gamma = new BruteForce("yammy");
 
@@ -154,6 +158,8 @@ class Program
         ConsoleKeyInfo cki;
         //BruteForce test = new BruteForce("hellojkih");
         Sheduler sheduler = new Sheduler();
+        
+        
         sheduler.Start();
 
         //Sheduler sheduler = new Sheduler();
