@@ -82,7 +82,7 @@ class BruteForce
 class Sheduler
 {
     // Квант.
-    private int _timeSlice = 1000000;
+    private int _timeSlice = 100000;
     private Queue<BruteForce> _bruteObjectsQueue;
     private Queue<Thread> _threadQueue;
     public List<BruteForce> _bruteList;
@@ -278,28 +278,33 @@ class Program
     {
         ConsoleKeyInfo cki;
         Sheduler sheduler = new Sheduler("hello", "daily", "ahega");
-        Thread spy = new Thread(() =>
+        Task spy = new Task(() =>
         {
             while (true)
             {
+                
                 cki = Console.ReadKey(true);
                 // При нажатии на клавишу олицетворяющую номер потока, все иные потоки останавливаются и вызывается меню
                 // по настройке выбранного потока.
                 if (cki.Key == ConsoleKey.D1 || cki.Key == ConsoleKey.D2 || cki.Key == ConsoleKey.D3)
                 {
+                    int temp = Int32.Parse(cki.Key.ToString()[cki.Key.ToString().Length - 1].ToString());
+                    if (!sheduler._threadList[temp - 1].IsAlive)
+                    {
+                        Console.WriteLine("--- Отказано в доступе. Поток {0} уже завершен ---", sheduler._threadList[temp - 1].Name);
+                        continue;
+                    }
+                    
                     // Останавливает все потоки.
                     sheduler.StopAll();
-                    
-                    int temp = Int32.Parse(cki.Key.ToString()[cki.Key.ToString().Length - 1].ToString());
-                    
-                    Console.WriteLine("\n---Выбран поток {0} для настройки ({1})---", 
+
+                    Console.WriteLine("\n--- Выбран поток {0} для настройки ({1}) ---\n", 
                         temp, sheduler._threadList[temp - 1].Name);
                     // ПЕРЕДЕЛАТЬ
-                    if (sheduler._bruteList[temp - 1].OnWait) Console.WriteLine("!На данный момент поток находится в режиме ОЖИДАНИЯ!");
-                    else Console.WriteLine("!Поток ГОТОВ к работе!");
-                    Console.WriteLine("!Минимальный уровень приоритета = 1; Максимальный уровень приоритета = 3!");
-                    Console.WriteLine("!Текущий уровень приоритета = {0}!", sheduler._bruteList[temp - 1].Priority);
-                    Console.WriteLine("Нажмите клавишу:" +
+                    if (sheduler._bruteList[temp - 1].OnWait) Console.WriteLine("> Поток в режиме ОЖИДАНИЯ ");
+                    else Console.WriteLine("> Поток ГОТОВ к работе");
+                    Console.WriteLine("> Текущий уровень приоритета = {0}\n", sheduler._bruteList[temp - 1].Priority);
+                    Console.WriteLine("Список команд:" +
                                       "\n<Q> - для выхода из настройки;" +
                                       "\n<S> - для введения потока в режим ожидания или его возобновление;" +
                                       "\n<+> - для увеличения приоритета потока;" +
@@ -323,13 +328,13 @@ class Program
                                 if (sheduler._bruteList[temp - 1].OnWait)
                                 {
                                     sheduler.SetOnReady(temp);
-                                    Console.WriteLine("!Поток ГОТОВ к работе!");
+                                    Console.WriteLine("Поток ГОТОВ к работе.");
                                     
                                 }
                                 else
                                 {
                                     sheduler.SetOnWait(temp);
-                                    Console.WriteLine("!На данный момент поток находится в режиме ОЖИДАНИЯ!");
+                                    Console.WriteLine("Поток в режиме ОЖИДАНИЯ.");
                                 }
                                 break;
                             
@@ -342,6 +347,7 @@ class Program
                                 }
                                 sheduler.AddInQueue(temp);
                                 sheduler._bruteList[temp - 1].Priority++;
+                                Console.WriteLine("Уровень приоритета = {0}", sheduler._bruteList[temp - 1].Priority);
                                 break;
                             
                             // Уменьшение приоритета.
@@ -353,10 +359,11 @@ class Program
                                 }
                                 sheduler.DelFromQueue(temp);
                                 sheduler._bruteList[temp - 1].Priority--;
+                                Console.WriteLine("Уровень приоритета = {0}", sheduler._bruteList[temp - 1].Priority);
                                 break;
                             
                             default:
-                                Console.WriteLine("No such command.");
+                                Console.WriteLine("Такой команды нет.");
                                 break;
                         }
                     }
@@ -367,13 +374,13 @@ class Program
             }
         });
         
+        Console.WriteLine("!Минимальный уровень приоритета потока = 1; Максимальный уровень приоритета потока = 3!\n");
         Console.WriteLine("Для выбора потока для настройки введите число от 1 до 3." +
                           "\n[1] - Alpha поток." +
                           "\n[2] - Beta поток." +
                           "\n[3] - Gamma поток.\n\n" +
                           "Нажмите <Enter> для начала работы программы.\n");
         Console.ReadLine();
-        
         
         spy.Start();
         sheduler.Start();
