@@ -150,6 +150,17 @@ class Sheduler
         gamma.Stop(true, gammaThread.Name);
     }
 
+    // Возобновляет работу БУПа.
+    public void ContinueShedular()
+    {
+        if (_threadQueue.Count == 0)
+        {
+            Console.WriteLine("Все потоки были поставлены в режим ожидания.");
+            return;
+        }
+        MRE.Set();
+    }
+
     // Ставит в режим ожидания поток.
     // На самом деле он просто удаляет его везде из очереди.
     // В очередь данный поток больше добавляться не будет.
@@ -158,6 +169,8 @@ class Sheduler
     {
         BruteForce bruteForce = _bruteList[numOfThread - 1];
         Thread threadOnWait = _threadList[numOfThread - 1];
+        Thread threadTemp = null;
+        BruteForce bruteTemp = null;
         bruteForce.OnWait = true;
         
         // Здесь мы проходимся по очереди экземпляров и потов.
@@ -165,11 +178,22 @@ class Sheduler
         // на ожидание не заносятся вновь в очереди.
         for (int i = 0; i < _threadList.Count; i++)
         {
-            Thread threadTemp = _threadQueue.Dequeue();
-            BruteForce bruteTemp = _bruteObjectsQueue.Dequeue();
+            if (_threadQueue.Count > 0) threadTemp = _threadQueue.Dequeue();
+            if (_bruteObjectsQueue.Count > 0) bruteTemp = _bruteObjectsQueue.Dequeue();
             if (threadOnWait != threadTemp) _threadQueue.Enqueue(threadTemp);
             if (bruteForce != bruteTemp) _bruteObjectsQueue.Enqueue(bruteTemp);
         }
+    }
+
+    // Ставит поток в режим готовности.
+    public void SetOnReady(int numOfThread)
+    {
+        BruteForce bruteForce = _bruteList[numOfThread - 1];
+        Thread threadOnReady = _threadList[numOfThread - 1];
+        bruteForce.OnWait = false;
+        
+        _bruteObjectsQueue.Enqueue(bruteForce);
+        _threadQueue.Enqueue(threadOnReady);
     }
     
     // Конструктор БУПа.
@@ -245,15 +269,17 @@ class Program
                     
                     Console.WriteLine("\n---Выбран поток {0} для настройки ({1})---", 
                         temp, sheduler._threadList[temp - 1].Name);
+                    // ПЕРЕДЕЛАТЬ
                     if (sheduler._bruteList[temp - 1].OnWait) Console.WriteLine("!На данный момент поток находится в режиме ОЖИДАНИЯ!");
                     else Console.WriteLine("!Поток ГОТОВ к работе!");
+                    Console.WriteLine("!Минимальный уровень приоритета = 1; Максимальный уровень приоритета = 3!");
                     Console.WriteLine("Нажмите клавишу:" +
-                                      "\n<Esc> - для выхода из настройки;" +
+                                      "\n<Q> - для выхода из настройки;" +
                                       "\n<S> - для введения потока в режим ожидания или его возобновление;" +
                                       "\n<+> - для увеличения приоритета потока;" +
                                       "\n<-> - для уменьшения приоритета потока.\n");
 
-                    while (cki.Key != ConsoleKey.Escape)
+                    while (cki.Key != ConsoleKey.Q)
                     {
                         Console.Write("Команда: ");
                         cki = Console.ReadKey();
@@ -261,18 +287,31 @@ class Program
 
                         switch (cki.Key)
                         {
-                            case ConsoleKey.Escape:
+                            // Выход из цикла.
+                            case ConsoleKey.Q:
                                 break;
                             
+                            // Постановка на режим ожидания или возобновления.
                             case ConsoleKey.S:
-                                sheduler.SetOnWait(temp);
-                                if (sheduler._bruteList[temp - 1].OnWait) Console.WriteLine("!На данный момент поток находится в режиме ОЖИДАНИЯ!");
-                                else Console.WriteLine("!Поток ГОТОВ к работе!");
+                                
+                                if (sheduler._bruteList[temp - 1].OnWait)
+                                {
+                                    sheduler.SetOnReady(temp);
+                                    Console.WriteLine("!Поток ГОТОВ к работе!");
+                                    
+                                }
+                                else
+                                {
+                                    sheduler.SetOnWait(temp);
+                                    Console.WriteLine("!На данный момент поток находится в режиме ОЖИДАНИЯ!");
+                                }
                                 break;
                             
+                            // Увеличения приоритета.
                             case ConsoleKey.OemPlus:
                                 break;
                             
+                            // Уменьшение приоритета.
                             case ConsoleKey.OemMinus:
                                 break;
                             
@@ -282,6 +321,8 @@ class Program
                         }
                     }
                     
+                    // Возобновление потока Main().
+                    sheduler.ContinueShedular();
                 }
             }
         });
