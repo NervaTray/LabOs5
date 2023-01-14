@@ -17,8 +17,9 @@ class BruteForce
     // false - работает;
     // true - остановлен.
     public bool OnWait = false;
-
-    public bool InitialState => _initialState;
+    public int Priority = 1;
+    
+    public string Word => new String(_word);
 
     // Переменная для приостановки потока.
     private ManualResetEvent MRE = new ManualResetEvent(true);
@@ -34,7 +35,6 @@ class BruteForce
             // Останавливает поток.
             MRE.WaitOne();
             
-            
             for (int i = 1; i < length; i++)
             {
                 if (_word[length - i] == '{')
@@ -44,15 +44,9 @@ class BruteForce
                 }
             }
 
-            if (Enumerable.SequenceEqual(_word, _findWord))
-            {
-                Console.WriteLine(new String(_word));
-                return;
-            }
-            //Console.WriteLine(new String(_word));
+            if (Enumerable.SequenceEqual(_word, _findWord)) return;
             _word[length - 1]++;
             _count++;
-
         }
     }
 
@@ -81,7 +75,6 @@ class BruteForce
 
         for (int i = 0; i < _word.Length; i++)
             _word[i] = 'a';
-        
     }
 }
 
@@ -95,7 +88,6 @@ class Sheduler
     public List<BruteForce> _bruteList;
     public List<Thread> _threadList;
     private Stopwatch? sw = null;
-    
     
     private BruteForce alpha;
     private BruteForce beta;
@@ -118,21 +110,24 @@ class Sheduler
             
             if (sw == null || sw.ElapsedTicks >= _timeSlice)
             {
-                
                 BruteForce temp = _bruteObjectsQueue.Dequeue();
                 temp.Stop(true, _threadQueue.Peek().Name);
-                
-                
+
                 if (_threadQueue.Peek().IsAlive)
                 {
                     _bruteObjectsQueue.Enqueue(temp);
                     _threadQueue.Enqueue(_threadQueue.Dequeue());
                 }
-                else _threadQueue.Dequeue();
+                else
+                {
+                    Console.WriteLine("-------------------------------------------------------");
+                    Console.WriteLine("Конец {0}.", _threadQueue.Dequeue().Name);
+                    Console.WriteLine("Искомое слово: \"{0}\"", temp.Word);
+                    Console.WriteLine("-------------------------------------------------------");
+                }
 
                 if (_bruteObjectsQueue.Count == 0) return;
-                
-                
+
                 _bruteObjectsQueue.Peek().Continue();
                 sw = Stopwatch.StartNew();
             }
@@ -195,14 +190,44 @@ class Sheduler
         _bruteObjectsQueue.Enqueue(bruteForce);
         _threadQueue.Enqueue(threadOnReady);
     }
+
+    // +1 в очередь (увеличивает приоритет).
+    public void AddInQueue(int numOfThread)
+    {
+        BruteForce bruteForce = _bruteList[numOfThread - 1];
+        Thread threadOnReady = _threadList[numOfThread - 1];
+        
+        _bruteObjectsQueue.Enqueue(bruteForce);
+        _threadQueue.Enqueue(threadOnReady);
+    }
+
+    // Уменьшает приоритет.
+    public void DelFromQueue(int numOfThread)
+    {
+        BruteForce bruteForce = _bruteList[numOfThread - 1];
+        Thread threadOnWait = _threadList[numOfThread - 1];
+        Thread threadTemp = null;
+        BruteForce bruteTemp = null;
+
+        for (int i = 0; i < _threadList.Count; i++)
+        {
+            threadTemp = _threadQueue.Dequeue();
+            bruteTemp = _bruteObjectsQueue.Dequeue();
+
+            if (threadOnWait == threadTemp || bruteForce == bruteTemp) return;
+            
+            _threadQueue.Enqueue(threadTemp);
+            _bruteObjectsQueue.Enqueue(bruteTemp);
+        }
+    }
     
     // Конструктор БУПа.
-    public Sheduler()
+    public Sheduler(string alphaWord, string betaWord, string gammaWord)
     {
         // Инициализация экземпляров класса BruteForce.
-        alpha = new BruteForce("ahegagiii");
-        beta = new BruteForce("dailygiii");
-        gamma = new BruteForce("yammygiii");
+        alpha = new BruteForce(alphaWord);
+        beta = new BruteForce(betaWord);
+        gamma = new BruteForce(gammaWord);
 
         // Инициализация потоков с методом экземпляра класса BruteForce.
         alphaThread = new Thread(alpha.Brute);
@@ -252,7 +277,7 @@ class Program
     static void Main()
     {
         ConsoleKeyInfo cki;
-        Sheduler sheduler = new Sheduler();
+        Sheduler sheduler = new Sheduler("hello", "daily", "ahega");
         Thread spy = new Thread(() =>
         {
             while (true)
@@ -273,6 +298,7 @@ class Program
                     if (sheduler._bruteList[temp - 1].OnWait) Console.WriteLine("!На данный момент поток находится в режиме ОЖИДАНИЯ!");
                     else Console.WriteLine("!Поток ГОТОВ к работе!");
                     Console.WriteLine("!Минимальный уровень приоритета = 1; Максимальный уровень приоритета = 3!");
+                    Console.WriteLine("!Текущий уровень приоритета = {0}!", sheduler._bruteList[temp - 1].Priority);
                     Console.WriteLine("Нажмите клавишу:" +
                                       "\n<Q> - для выхода из настройки;" +
                                       "\n<S> - для введения потока в режим ожидания или его возобновление;" +
@@ -309,10 +335,24 @@ class Program
                             
                             // Увеличения приоритета.
                             case ConsoleKey.OemPlus:
+                                if (sheduler._bruteList[temp - 1].Priority > 2)
+                                {
+                                    Console.WriteLine("Уровень приоритета не может быть больше 3.");
+                                    continue;
+                                }
+                                sheduler.AddInQueue(temp);
+                                sheduler._bruteList[temp - 1].Priority++;
                                 break;
                             
                             // Уменьшение приоритета.
                             case ConsoleKey.OemMinus:
+                                if (sheduler._bruteList[temp - 1].Priority < 2)
+                                {
+                                    Console.WriteLine("Уровень приоритета не может быть меньше 1.");
+                                    continue;
+                                }
+                                sheduler.DelFromQueue(temp);
+                                sheduler._bruteList[temp - 1].Priority--;
                                 break;
                             
                             default:
