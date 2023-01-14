@@ -296,51 +296,5 @@ class Program
         
         spy.Start();
         sheduler.Start();
-
-        //Sheduler sheduler = new Sheduler();
-        // Stopwatch sw = null;
-        // int _timeSlice = 1000000;
-        //
-        // bool trigger = true;
-        //
-        // Thread th = new Thread(test.Brute);
-        // th.Start();
-
-        // while (true)
-        // {
-        //     if (sw == null || sw.ElapsedTicks >= _timeSlice)
-        //     { 
-        //         if (trigger)
-        //         {
-        //             test.Stop();
-        //             trigger = false;
-        //         }
-        //         else
-        //         {
-        //             test.Continue();
-        //             trigger = true;
-        //         }
-        //         sw = Stopwatch.StartNew();
-        //     }
-        //
-        //     // cki = Console.ReadKey();
-        //     // if (cki.Key == ConsoleKey.D2)
-        //     // {
-        //     //     if (test.InitialState) test.Stop();
-        //     //     else test.Continue();
-        //     // }
-        //     
-        //     // Console.ReadLine();
-        //     // if (trigger)
-        //     // {
-        //     //     test.Stop();
-        //     //     trigger = false;
-        //     // }
-        //     // else
-        //     // {
-        //     //     test.Continue();
-        //     //     trigger = true;
-        //     // }
-        // }
     }
 }
