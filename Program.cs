@@ -11,6 +11,12 @@ class BruteForce
     // Показывает initialState флаг экземпляра класса ManualResetEvent.
     private bool _initialState = true;
     private int _count = 0;
+    // Переменная нужна для отображения в консоли, что поток остановлен или работает.
+    // (имеется в виду тот случай, когда пользователь намеренно его остановил
+    // и он больше не добавляется в очередь).
+    // false - работает;
+    // true - остановлен.
+    public bool OnWait = false;
 
     public bool InitialState => _initialState;
 
@@ -21,6 +27,7 @@ class BruteForce
     // Сам брутфорс
     public void Brute()
     {
+        Thread.Sleep(0);
         
         while (true)
         {
@@ -85,14 +92,30 @@ class Sheduler
     private int _timeSlice = 1000000;
     private Queue<BruteForce> _bruteObjectsQueue;
     private Queue<Thread> _threadQueue;
-    private Stopwatch sw = null;
+    public List<BruteForce> _bruteList;
+    public List<Thread> _threadList;
+    private Stopwatch? sw = null;
     
+    
+    private BruteForce alpha;
+    private BruteForce beta;
+    private BruteForce gamma;
+
+    private Thread alphaThread;
+    private Thread betaThread;
+    private Thread gammaThread;
+
+    // Переменная для приостановки потока.
+    private ManualResetEvent MRE = new ManualResetEvent(true);
 
     // Метод создает очередь и дает потоку проработать в течении кванта.
     public void Start()
     {
         while (true)
         {
+            // Останавливает поток для введения команд.
+            MRE.WaitOne();
+            
             if (sw == null || sw.ElapsedTicks >= _timeSlice)
             {
                 
@@ -115,22 +138,59 @@ class Sheduler
             }
         }
     }
+
+    // Останавливает все потоки.
+    public void StopAll()
+    {
+        // Меняет флаг InitialState для остановки работы главного потока и метода Start().
+        MRE.Reset();
+
+        alpha.Stop(true, alphaThread.Name);
+        beta.Stop(true, betaThread.Name);
+        gamma.Stop(true, gammaThread.Name);
+    }
+
+    // Ставит в режим ожидания поток.
+    // На самом деле он просто удаляет его везде из очереди.
+    // В очередь данный поток больше добавляться не будет.
+    // Но он будет жив.
+    public void SetOnWait(int numOfThread)
+    {
+        BruteForce bruteForce = _bruteList[numOfThread - 1];
+        Thread threadOnWait = _threadList[numOfThread - 1];
+        bruteForce.OnWait = true;
+        
+        // Здесь мы проходимся по очереди экземпляров и потов.
+        // Экземпляр и поток, которые должны быть поставлены
+        // на ожидание не заносятся вновь в очереди.
+        for (int i = 0; i < _threadList.Count; i++)
+        {
+            Thread threadTemp = _threadQueue.Dequeue();
+            BruteForce bruteTemp = _bruteObjectsQueue.Dequeue();
+            if (threadOnWait != threadTemp) _threadQueue.Enqueue(threadTemp);
+            if (bruteForce != bruteTemp) _bruteObjectsQueue.Enqueue(bruteTemp);
+        }
+    }
     
     // Конструктор БУПа.
     public Sheduler()
     {
-        BruteForce alpha = new BruteForce("ahega");
-        BruteForce beta = new BruteForce("daily");
-        BruteForce gamma = new BruteForce("yammy");
+        // Инициализация экземпляров класса BruteForce.
+        alpha = new BruteForce("ahegagiii");
+        beta = new BruteForce("dailygiii");
+        gamma = new BruteForce("yammygiii");
 
-        Thread alphaThread = new Thread(alpha.Brute);
-        Thread betaThread = new Thread(beta.Brute);
-        Thread gammaThread = new Thread(gamma.Brute);
+        // Инициализация потоков с методом экземпляра класса BruteForce.
+        alphaThread = new Thread(alpha.Brute);
+        betaThread = new Thread(beta.Brute);
+        gammaThread = new Thread(gamma.Brute);
 
+        // Задание имен для каждого потока.
         alphaThread.Name = "Alpha Thread";
         betaThread.Name = "Beta Thread";
         gammaThread.Name = "Gamma Thread";
 
+        // Запуск и остановка каждого потока для дальнейшей работы в очереди.
         alphaThread.Start();
         alpha.Stop();
         betaThread.Start();
@@ -138,28 +198,103 @@ class Sheduler
         gammaThread.Start();
         gamma.Stop();
 
-        _bruteObjectsQueue = new Queue<BruteForce>();
-        _bruteObjectsQueue.Enqueue(alpha);
-        _bruteObjectsQueue.Enqueue(beta);
-        _bruteObjectsQueue.Enqueue(gamma);
+        // Инициализация списка экземпляров класса BruteForce.
+        _bruteList = new List<BruteForce>();
+        _bruteList.Add(alpha);
+        _bruteList.Add(beta);
+        _bruteList.Add(gamma);
 
+        // Инициализация списка потоков.
+        _threadList = new List<Thread>();
+        _threadList.Add(alphaThread);
+        _threadList.Add(betaThread);
+        _threadList.Add(gammaThread);
+        
+        // Занесение в очередь экземпляров класса BruteForce. 
+        _bruteObjectsQueue = new Queue<BruteForce>();
+        for (int i = 0; i < 3; i++)
+            _bruteObjectsQueue.Enqueue(_bruteList[i]);
+
+        // Занесение в очередь потоков.
         _threadQueue = new Queue<Thread>();
-        _threadQueue.Enqueue(alphaThread);
-        _threadQueue.Enqueue(betaThread);
-        _threadQueue.Enqueue(gammaThread);
+        for (int i = 0; i < 3; i++)
+            _threadQueue.Enqueue(_threadList[i]);
     }
 }
-    
+
 
 class Program
 {
     static void Main()
     {
         ConsoleKeyInfo cki;
-        //BruteForce test = new BruteForce("hellojkih");
         Sheduler sheduler = new Sheduler();
+        Thread spy = new Thread(() =>
+        {
+            while (true)
+            {
+                cki = Console.ReadKey(true);
+                // При нажатии на клавишу олицетворяющую номер потока, все иные потоки останавливаются и вызывается меню
+                // по настройке выбранного потока.
+                if (cki.Key == ConsoleKey.D1 || cki.Key == ConsoleKey.D2 || cki.Key == ConsoleKey.D3)
+                {
+                    // Останавливает все потоки.
+                    sheduler.StopAll();
+                    
+                    int temp = Int32.Parse(cki.Key.ToString()[cki.Key.ToString().Length - 1].ToString());
+                    
+                    Console.WriteLine("\n---Выбран поток {0} для настройки ({1})---", 
+                        temp, sheduler._threadList[temp - 1].Name);
+                    if (sheduler._bruteList[temp - 1].OnWait) Console.WriteLine("!На данный момент поток находится в режиме ОЖИДАНИЯ!");
+                    else Console.WriteLine("!Поток ГОТОВ к работе!");
+                    Console.WriteLine("Нажмите клавишу:" +
+                                      "\n<Esc> - для выхода из настройки;" +
+                                      "\n<S> - для введения потока в режим ожидания или его возобновление;" +
+                                      "\n<+> - для увеличения приоритета потока;" +
+                                      "\n<-> - для уменьшения приоритета потока.\n");
+
+                    while (cki.Key != ConsoleKey.Escape)
+                    {
+                        Console.Write("Команда: ");
+                        cki = Console.ReadKey();
+                        Console.WriteLine();
+
+                        switch (cki.Key)
+                        {
+                            case ConsoleKey.Escape:
+                                break;
+                            
+                            case ConsoleKey.S:
+                                sheduler.SetOnWait(temp);
+                                if (sheduler._bruteList[temp - 1].OnWait) Console.WriteLine("!На данный момент поток находится в режиме ОЖИДАНИЯ!");
+                                else Console.WriteLine("!Поток ГОТОВ к работе!");
+                                break;
+                            
+                            case ConsoleKey.OemPlus:
+                                break;
+                            
+                            case ConsoleKey.OemMinus:
+                                break;
+                            
+                            default:
+                                Console.WriteLine("No such command.");
+                                break;
+                        }
+                    }
+                    
+                }
+            }
+        });
+        
+        Console.WriteLine("Для выбора потока для настройки введите число от 1 до 3." +
+                          "\n[1] - Alpha поток." +
+                          "\n[2] - Beta поток." +
+                          "\n[3] - Gamma поток.\n\n" +
+                          "Нажмите <Enter> для начала работы программы.\n");
+        Console.ReadLine();
         
         
+        spy.Start();
         sheduler.Start();
 
         //Sheduler sheduler = new Sheduler();
