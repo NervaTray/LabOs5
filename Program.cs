@@ -17,6 +17,7 @@ class BruteForce
     // false - работает;
     // true - остановлен.
     public bool OnWait = false;
+    // Приоритет равен нулю, если поток, в котором совершался перебор уже выполнил свою работу.
     public int Priority = 1;
     
     public string Word => new String(_word);
@@ -28,6 +29,7 @@ class BruteForce
     // Сам брутфорс
     public void Brute()
     {
+        //Console.WriteLine(Thread.CurrentThread.ManagedThreadId);
         Thread.Sleep(0);
         
         while (true)
@@ -88,6 +90,7 @@ class Sheduler
     public List<BruteForce> _bruteList;
     public List<Thread> _threadList;
     private Stopwatch? sw = null;
+    private int _deadCount = 0;
     
     private BruteForce alpha;
     private BruteForce beta;
@@ -107,7 +110,7 @@ class Sheduler
         {
             // Останавливает поток для введения команд.
             MRE.WaitOne();
-            
+
             if (sw == null || sw.ElapsedTicks >= _timeSlice)
             {
                 BruteForce temp = _bruteObjectsQueue.Dequeue();
@@ -120,13 +123,28 @@ class Sheduler
                 }
                 else
                 {
-                    Console.WriteLine("-------------------------------------------------------");
-                    Console.WriteLine("Конец {0}.", _threadQueue.Dequeue().Name);
-                    Console.WriteLine("Искомое слово: \"{0}\"", temp.Word);
-                    Console.WriteLine("-------------------------------------------------------");
+                    Thread threadTemp = _threadQueue.Dequeue();
+
+                    if (temp.Priority != 0)
+                    {
+                        Console.WriteLine("-------------------------------------------------------");
+                        Console.WriteLine("Конец {0}.", threadTemp.Name);
+                        Console.WriteLine("Искомое слово: \"{0}\"", temp.Word);
+                        Console.WriteLine("-------------------------------------------------------");
+                        // Если поток полностью отработал, то повышается значение МЕРТВОГО счетчика.
+                        _deadCount++;
+                        temp.Priority = 0;
+                    }
                 }
 
-                if (_bruteObjectsQueue.Count == 0) return;
+                // Выходит из метода если все потоки отработали.
+                if (_deadCount == 3) return;
+                if (_bruteObjectsQueue.Count == 0)
+                {
+                    MRE.Reset();
+                    Console.WriteLine("\nВсе незавершенные потоки находятся в режиме ожидания.");
+                    continue;
+                }
 
                 _bruteObjectsQueue.Peek().Continue();
                 sw = Stopwatch.StartNew();
@@ -150,7 +168,7 @@ class Sheduler
     {
         if (_threadQueue.Count == 0)
         {
-            Console.WriteLine("Все потоки были поставлены в режим ожидания.");
+            Console.WriteLine("\nВсе потоки были поставлены в режим ожидания.");
             return;
         }
         MRE.Set();
@@ -171,7 +189,8 @@ class Sheduler
         // Здесь мы проходимся по очереди экземпляров и потов.
         // Экземпляр и поток, которые должны быть поставлены
         // на ожидание не заносятся вновь в очереди.
-        for (int i = 0; i < _threadList.Count; i++)
+        int tempLength = _threadQueue.Count;
+        for (int i = 0; i < tempLength; i++)
         {
             if (_threadQueue.Count > 0) threadTemp = _threadQueue.Dequeue();
             if (_bruteObjectsQueue.Count > 0) bruteTemp = _bruteObjectsQueue.Dequeue();
@@ -186,9 +205,12 @@ class Sheduler
         BruteForce bruteForce = _bruteList[numOfThread - 1];
         Thread threadOnReady = _threadList[numOfThread - 1];
         bruteForce.OnWait = false;
-        
-        _bruteObjectsQueue.Enqueue(bruteForce);
-        _threadQueue.Enqueue(threadOnReady);
+
+        for (int i = 0; i < bruteForce.Priority; i++)
+        {
+            _bruteObjectsQueue.Enqueue(bruteForce);
+            _threadQueue.Enqueue(threadOnReady);
+        }
     }
 
     // +1 в очередь (увеличивает приоритет).
@@ -278,8 +300,10 @@ class Program
     {
         ConsoleKeyInfo cki;
         Sheduler sheduler = new Sheduler("hello", "daily", "ahega");
+        //Console.WriteLine(Thread.CurrentThread.ManagedThreadId);
         Task spy = new Task(() =>
         {
+            //Console.WriteLine(Thread.CurrentThread.ManagedThreadId);
             while (true)
             {
                 
